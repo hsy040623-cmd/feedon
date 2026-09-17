@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import SiteHeader from "@/components/SiteHeader";
 import MotionLink from "@/components/MotionLink";
@@ -15,10 +16,12 @@ export default async function Home() {
     .order("created_at", { ascending: false });
 
   const projects = data ?? [];
+  const userEmail = await getServerAuthUserEmail();
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
       <SiteHeader
+        userEmail={userEmail}
         rightSlot={
           <MotionLink
             href="/projects"

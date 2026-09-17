@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
 import ScrollMotionField from "@/components/ScrollMotionField";
 import SiteHeader from "@/components/SiteHeader";
 import RequestForm from "@/components/RequestForm";
@@ -37,6 +38,7 @@ export default async function WorkspacePage(props: PageProps<"/workspace/[projec
     ambiguityReason: r.ambiguity_reason,
     createdAt: r.created_at,
   }));
+  const userEmail = await getServerAuthUserEmail();
 
   return (
     <div className="relative min-h-screen text-white">
@@ -45,6 +47,7 @@ export default async function WorkspacePage(props: PageProps<"/workspace/[projec
 
       <SiteHeader
         backHref="/start"
+        userEmail={userEmail}
         rightSlot={
           <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-white">{project.name}</span>
         }

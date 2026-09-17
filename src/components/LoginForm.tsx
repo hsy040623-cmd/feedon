@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import MotionButton from "./MotionButton";
+import MotionLink from "./MotionLink";
 
-// Design Ref: DESIGN.md 4번(보안·데이터 처리) — "1인 작업자 계정... Supabase의 기본 인증 기능으로 로그인만 확인"
-// Plan SC: PLAN.md 작업 15번 — 최소 인증. 이메일+비밀번호 로그인과, 비밀번호를 잊었을 때
-// Supabase의 재설정 메일을 요청하는 기능만 제공한다(회원가입 UI는 비범위).
+// Design Ref: 사용자 요청 — 로그인은 선택 사항이고(비로그인도 자유롭게 이용 가능), 로그인하고 싶은
+// 사람을 위한 이메일+비밀번호 로그인, 비밀번호 재설정, 회원가입(→ /signup) 진입점을 제공한다.
 // 다른 폼(RequestForm 등)과 마찬가지로 <form onSubmit> 대신 MotionButton의 onPress로 제출을 처리한다.
 
 export default function LoginForm() {
@@ -93,14 +93,22 @@ export default function LoginForm() {
         {submitting ? "로그인 중..." : "로그인"}
       </MotionButton>
 
-      <button
-        type="button"
-        onClick={handleResetPassword}
-        disabled={submitting}
-        className="w-fit text-xs font-bold text-black underline underline-offset-2 hover:text-accent disabled:opacity-40"
-      >
-        비밀번호를 잊으셨나요?
-      </button>
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={handleResetPassword}
+          disabled={submitting}
+          className="text-xs font-bold text-black underline underline-offset-2 hover:text-accent disabled:opacity-40"
+        >
+          비밀번호를 잊으셨나요?
+        </button>
+        <MotionLink
+          href="/signup"
+          className="text-xs font-bold text-black underline underline-offset-2 hover:text-accent"
+        >
+          회원가입
+        </MotionLink>
+      </div>
 
       {error && <p className="w-fit rounded-full bg-accent px-3 py-1 text-xs font-bold text-white">{error}</p>}
       {resetMessage && (

@@ -6,6 +6,15 @@ import { createServerClient } from "@supabase/ssr";
 // 데이터(프로젝트/요청/제안) 접근용 서비스 롤 클라이언트(src/lib/supabase.ts)와는 용도가 다르다 —
 // 이 클라이언트는 anon 키 + 쿠키의 로그인 세션만 다루고, RLS를 우회하지 않는다.
 
+/** 서버 컴포넌트에서 "지금 로그인한 사람이 있는지"만 간단히 확인할 때 쓴다 (없으면 게스트) */
+export async function getServerAuthUserEmail(): Promise<string | null> {
+  const supabase = await createSupabaseServerAuthClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.email ?? null;
+}
+
 export async function createSupabaseServerAuthClient() {
   const cookieStore = await cookies();
 

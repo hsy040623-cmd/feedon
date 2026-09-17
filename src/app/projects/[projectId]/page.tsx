@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
 import ScrollMotionField from "@/components/ScrollMotionField";
 import SiteHeader from "@/components/SiteHeader";
 import ProjectListPanel from "@/components/ProjectListPanel";
@@ -37,12 +38,14 @@ export default async function ProjectHistoryPage(props: PageProps<"/projects/[pr
     status: r.status,
     createdAt: r.created_at,
   }));
+  const userEmail = await getServerAuthUserEmail();
 
   return (
     <div className="relative min-h-screen text-white">
       <ScrollMotionField showShape={false} />
       <SiteHeader
         backHref="/"
+        userEmail={userEmail}
         rightSlot={
           <MotionLink
             href={`/workspace/${activeProject.id}`}

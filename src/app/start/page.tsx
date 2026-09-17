@@ -3,16 +3,19 @@ import ScrollHint from "@/components/ScrollHint";
 import ScrollMotionField from "@/components/ScrollMotionField";
 import SiteHeader from "@/components/SiteHeader";
 import StartProjectForm from "@/components/StartProjectForm";
+import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
 
 // Design Ref: virtual.plus-ex.com 레퍼런스 — 시작하기를 누르면 모션이 있는 별도 페이지로 이동하고,
 // 스크롤을 내리는 동안 배경 모션이 끊기지 않고 이어진다(ScrollMotionField, 스크롤 위치에 따라 반응).
 // 홈 화면(동심원 모티프)과 구분되도록 이 페이지는 "+" 패턴 필드로 다르게 만들었다.
 // 스크롤을 내리면 프로젝트 생성 폼이 나오고, 완료하면 /workspace/[projectId]로 이동한다.
 
-export default function StartPage() {
+export default async function StartPage() {
+  const userEmail = await getServerAuthUserEmail();
+
   return (
     <main className="relative text-white">
-      <SiteHeader backHref="/" />
+      <SiteHeader backHref="/" userEmail={userEmail} />
       <ScrollMotionField />
 
       <section className="relative z-10 flex min-h-screen flex-col items-start justify-end p-8">

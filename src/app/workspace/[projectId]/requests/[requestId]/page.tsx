@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
 import ScrollMotionField from "@/components/ScrollMotionField";
 import SiteHeader from "@/components/SiteHeader";
 import { REQUEST_STATUS_LABEL } from "@/lib/request-status";
@@ -59,6 +60,7 @@ export default async function RequestDetailPage(
   const status = request.status as RequestStatus;
   const isNeedsReview = status === "NEEDS_REVIEW";
   const isFailed = status === "FAILED";
+  const userEmail = await getServerAuthUserEmail();
 
   return (
     <div className="relative min-h-screen text-white">
@@ -67,6 +69,7 @@ export default async function RequestDetailPage(
 
       <SiteHeader
         backHref={`/workspace/${project.id}`}
+        userEmail={userEmail}
         rightSlot={
           <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-white">{project.name}</span>
         }

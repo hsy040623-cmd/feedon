@@ -1,15 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Design Ref: DESIGN.md 4번(보안·데이터 처리) — "1인 작업자 계정... Supabase의 기본 인증 기능으로 로그인만 확인"
-// Plan SC: PLAN.md 작업 15번 — 최소 인증 적용. /login을 빼고는 모든 화면·API 요청을 이 Proxy에서
-// 먼저 확인해서, 로그인하지 않았으면 화면은 /login으로 보내고 API는 401을 돌려준다.
+// Design Ref: 사용자 요청 — "로그인 안 해도 자유롭게 쓸 수 있게" 앱 전체를 공개로 열어두고,
+// 로그인은 선택 사항(우측 상단 버튼)으로만 제공한다. PLAN.md 15번에서 만든 "전체 화면 강제 로그인"은
+// 여기서 걷어내고, 로그인 세션 쿠키를 최신 상태로 갱신하는 역할만 남긴다.
 // (이 Next.js 버전은 middleware.ts가 proxy.ts로 이름이 바뀌었다 — node_modules/next/dist/docs 확인함)
 
-// 로그인 여부와 상관없이 항상 들어갈 수 있는 경로 (초대/비밀번호 재설정 흐름 포함)
-const ALWAYS_ALLOWED_PATHS = ["/auth/confirm", "/reset-password"];
-// 로그인 안 했을 때만 허용하고, 이미 로그인했으면 "/"로 돌려보내는 경로
-const LOGGED_OUT_ONLY_PATHS = ["/login"];
+// 이미 로그인한 사람이 다시 들어가면 "/"로 돌려보내는 경로 (로그인/회원가입 화면)
+const LOGGED_OUT_ONLY_PATHS = ["/login", "/signup"];
 
 function matchesPath(pathname: string, paths: string[]) {
   return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
@@ -36,28 +34,13 @@ export default async function proxy(request: NextRequest) {
   );
 
   // getSession()이 아닌 getUser()를 쓴다 — 쿠키 값만 믿지 않고 Supabase Auth 서버에 다시 확인한다.
+  // (로그인 상태를 화면에 반영하기 위한 용도일 뿐, 여기서 접근을 막지는 않는다)
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isApi = pathname.startsWith("/api/");
-  const alwaysAllowed = matchesPath(pathname, ALWAYS_ALLOWED_PATHS);
   const loggedOutOnly = matchesPath(pathname, LOGGED_OUT_ONLY_PATHS);
-
-  if (alwaysAllowed) {
-    return response;
-  }
-
-  if (!user && !loggedOutOnly) {
-    if (isApi) {
-      return NextResponse.json(
-        { error: { code: "UNAUTHENTICATED", message: "로그인이 필요합니다." } },
-        { status: 401 }
-      );
-    }
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
 
   if (user && loggedOutOnly) {
     return NextResponse.redirect(new URL("/", request.url));
