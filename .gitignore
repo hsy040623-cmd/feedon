@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# bkit 플러그인 로컬 세션 상태(토큰 로그·감사 기록 등, 커밋 대상 아님)
+.bkit
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
