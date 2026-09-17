@@ -9,6 +9,7 @@ import {
   ALLOWED_TARGET_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
   getFileExtension,
+  getImageExtensionFromMimeType,
 } from "@/lib/upload-constraints";
 
 // Design Ref: DESIGN.md 6번(API 명세) — POST /api/requests
@@ -84,7 +85,9 @@ export async function POST(request: Request) {
 
   const targetFileBuffer = Buffer.from(await targetFile.arrayBuffer());
   const targetFileContentType = targetFile.type || "application/octet-stream";
-  const targetFileStoragePath = `requests/${requestId}/target-${targetFile.name}`;
+  // Storage 키는 원본 파일명(한글 등) 대신 검증된 확장자만 써서 "Invalid key" 오류를 피한다.
+  // 사람이 보는 원래 파일명은 target_file_name 컬럼에 그대로 저장해 화면·다운로드에 쓴다.
+  const targetFileStoragePath = `requests/${requestId}/target.${extension}`;
   const targetUpload = await supabase.storage
     .from("feedback-files")
     .upload(targetFileStoragePath, targetFileBuffer, { contentType: targetFileContentType });
@@ -99,7 +102,7 @@ export async function POST(request: Request) {
   const referenceImagePaths: string[] = [];
   const referenceImageInputs: ReferenceImageInput[] = [];
   for (const [index, image] of referenceImages.entries()) {
-    const path = `requests/${requestId}/ref-${index}-${image.name}`;
+    const path = `requests/${requestId}/ref-${index}.${getImageExtensionFromMimeType(image.type)}`;
     const buffer = Buffer.from(await image.arrayBuffer());
     const uploadResult = await supabase.storage
       .from("feedback-files")
@@ -160,7 +163,7 @@ export async function POST(request: Request) {
       });
 
       const proposalId = randomUUID();
-      const proposalStoragePath = `requests/${requestId}/proposal-${proposalId}-${targetFile.name}`;
+      const proposalStoragePath = `requests/${requestId}/proposal-${proposalId}.${extension}`;
       const proposalUpload = await supabase.storage
         .from("feedback-files")
         .upload(proposalStoragePath, proposal.buffer, { contentType: proposal.contentType });

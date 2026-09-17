@@ -15,3 +15,11 @@ export function getFileExtension(fileName: string): string {
   const idx = fileName.lastIndexOf(".");
   return idx === -1 ? "" : fileName.slice(idx + 1).toLowerCase();
 }
+
+/**
+ * 이미지 MIME 타입 → 확장자. Supabase Storage 키에 원본 파일명(한글 등)을 그대로 쓰면
+ * "Invalid key" 오류가 나므로, 참고 이미지는 파일명 대신 여기서 안전한 확장자를 구한다.
+ */
+export function getImageExtensionFromMimeType(mimeType: string): string {
+  return mimeType === "image/png" ? "png" : "jpg";
+}

@@ -44,16 +44,25 @@ export default async function RequestDetailPage(
     .eq("request_id", request.id)
     .maybeSingle();
 
+  // Storage 키는 확장자만 쓰는 안전한 이름이라(원본 파일명은 여기서만 쓰임), 다운로드할 때
+  // 브라우저가 원래 파일명으로 저장하도록 download 파라미터를 붙인다.
+  // (createSignedUrl의 download 옵션은 한글 등 비-ASCII 파일명을 이중 인코딩하는 라이브러리 버그가 있어
+  // 직접 encodeURIComponent로 한 번만 인코딩해 붙인다)
   const { data: originalUrlData } = await supabase.storage
     .from("feedback-files")
     .createSignedUrl(request.target_file_storage_path, SIGNED_URL_EXPIRES_IN_SECONDS);
+  const originalDownloadUrl = originalUrlData?.signedUrl
+    ? `${originalUrlData.signedUrl}&download=${encodeURIComponent(request.target_file_name)}`
+    : null;
 
   let proposalUrl: string | null = null;
   if (proposal) {
     const { data: proposalUrlData } = await supabase.storage
       .from("feedback-files")
       .createSignedUrl(proposal.proposed_file_storage_path, SIGNED_URL_EXPIRES_IN_SECONDS);
-    proposalUrl = proposalUrlData?.signedUrl ?? null;
+    proposalUrl = proposalUrlData?.signedUrl
+      ? `${proposalUrlData.signedUrl}&download=${encodeURIComponent(request.target_file_name)}`
+      : null;
   }
 
   const changes = (proposal?.changes ?? []) as ChangeItem[];
@@ -107,9 +116,9 @@ export default async function RequestDetailPage(
           <div className="flex flex-col gap-2">
             <h2 className="text-xs font-bold uppercase tracking-wide">원본 파일</h2>
             <p className="text-sm">{request.target_file_name}</p>
-            {originalUrlData?.signedUrl ? (
+            {originalDownloadUrl ? (
               <a
-                href={originalUrlData.signedUrl}
+                href={originalDownloadUrl}
                 className="w-fit rounded-full bg-black px-3 py-1 text-xs font-bold text-white transition-all hover:bg-accent"
               >
                 원본 다운로드

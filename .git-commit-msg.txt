@@ -1,0 +1,16 @@
+Fix upload failure for non-ASCII (Korean) file names
+
+Supabase Storage rejects object keys containing non-ASCII
+characters ("Invalid key"), so any target file or reference image
+with a Korean name failed to upload. Storage keys now use only the
+validated extension (target.docx, ref-0.png, proposal-<id>.xlsx);
+the original file name is kept in target_file_name for display and
+re-attached via a `download=` query param on signed URLs so
+downloads still save with the original name.
+
+Also works around a storage-js bug where createSignedUrl's
+`download` option double-encodes non-ASCII file names, by
+appending a single encodeURIComponent-encoded download param
+instead of using the option.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
