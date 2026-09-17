@@ -6,8 +6,8 @@ import { getServerAuthUserId } from "./supabase-server-auth";
 // 목록을 열람할 수 있으면 안 된다"를 동시에 만족시키기 위한 모듈.
 // - 로그인한 사람: projects.owner_id로 "내가 만든 프로젝트"만 목록에 노출한다.
 // - 게스트(비로그인): 이 브라우저가 만든 프로젝트 id를 쿠키에 저장해두고, 그 id들만 목록에 노출한다.
-// - 목록(열람)만 막는 것이고, 프로젝트 id(링크)를 직접 아는 사람은 지금처럼 그 프로젝트에 계속 들어갈 수 있다
-//   (승인/반려/삭제 등 "쓰기" 작업의 인증은 별도 항목에서 다룬다).
+// - 목록(열람)은 이렇게 막되, 프로젝트 id(링크)를 직접 아는 사람은 지금처럼 그 프로젝트를 "읽는" 건 계속
+//   된다. 삭제·승인·반려 같은 "쓰기"는 canModifyProject()로 별도 확인한다 (CHECK.md 2번).
 
 export const GUEST_PROJECT_IDS_COOKIE = "feedon_project_ids";
 const MAX_GUEST_PROJECT_IDS = 100;
@@ -62,4 +62,18 @@ export async function fetchVisibleProjects(): Promise<VisibleProject[]> {
     .in("id", guestIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map((p) => ({ id: p.id, name: p.name, createdAt: p.created_at }));
+}
+
+/**
+ * 삭제·승인·반려처럼 프로젝트를 바꾸는 작업을 이 요청이 해도 되는지 확인한다.
+ * - 로그인 프로젝트(owner_id 있음): 그 소유자로 로그인한 사람만.
+ * - 게스트 프로젝트(owner_id 없음): 그 프로젝트를 만든 브라우저(쿠키에 id가 있음)만.
+ */
+export async function canModifyProject(projectId: string, projectOwnerId: string | null): Promise<boolean> {
+  const userId = await getServerAuthUserId();
+  if (projectOwnerId) {
+    return userId === projectOwnerId;
+  }
+  const guestIds = await getGuestProjectIds();
+  return guestIds.includes(projectId);
 }

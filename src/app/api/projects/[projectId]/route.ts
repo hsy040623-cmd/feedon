@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { canModifyProject } from "@/lib/project-visibility";
 
 // Design Ref: 사용자 요청 — 프로젝트 목록 화면에서 프로젝트를 삭제할 수 있어야 한다.
 // 프로젝트를 지우면 관련 요청·제안 행은 DB의 on delete cascade로 함께 지워지지만,
 // Storage에 올라간 실제 파일(대상 파일·참고 이미지·제안 파일)은 별도로 지워야 한다.
+// Design Ref: CHECK.md 2번(치명적) — 소유자(로그인)나 만든 브라우저(게스트 쿠키)가 아니면 삭제를 막는다.
 
 export async function DELETE(
   _request: Request,
@@ -11,6 +13,26 @@ export async function DELETE(
 ) {
   const { projectId } = await context.params;
   const supabase = createSupabaseServerClient();
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id, owner_id")
+    .eq("id", projectId)
+    .single();
+
+  if (projectError || !project) {
+    return NextResponse.json(
+      { error: { code: "PROJECT_NOT_FOUND", message: "프로젝트를 찾을 수 없습니다." } },
+      { status: 404 }
+    );
+  }
+
+  if (!(await canModifyProject(projectId, project.owner_id))) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "이 프로젝트를 삭제할 권한이 없습니다." } },
+      { status: 403 }
+    );
+  }
 
   const { data: requests, error: requestsError } = await supabase
     .from("requests")
