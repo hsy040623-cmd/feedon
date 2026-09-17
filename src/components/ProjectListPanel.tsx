@@ -1,7 +1,9 @@
 import MotionLink from "./MotionLink";
+import DeleteProjectButton from "./DeleteProjectButton";
 
 // Design Ref: DESIGN.md 화면3(프로젝트 목록 화면) 좌측 — 프로젝트(클라이언트별 작업 건) 목록
 // Plan SC: PLAN.md 작업 14번 — 프로젝트별 요청 이력 화면(상태별 목록) 구현
+// 사용자 요청: 각 프로젝트 옆에 삭제 아이콘을 둬서 바로 삭제할 수 있게 한다.
 
 export interface ProjectListItem {
   id: string;
@@ -35,15 +37,16 @@ export default function ProjectListPanel({
           {projects.map((project) => {
             const isActive = project.id === activeProjectId;
             return (
-              <li key={project.id}>
+              <li key={project.id} className="flex items-center gap-1">
                 <MotionLink
                   href={`/projects/${project.id}`}
-                  className={`block truncate rounded px-3 py-2 text-sm font-bold ${
+                  className={`block flex-1 truncate rounded px-3 py-2 text-sm font-bold ${
                     isActive ? "bg-black text-white" : "text-black hover:bg-zinc-100"
                   }`}
                 >
                   {project.name}
                 </MotionLink>
+                <DeleteProjectButton projectId={project.id} projectName={project.name} isActive={isActive} />
               </li>
             );
           })}
