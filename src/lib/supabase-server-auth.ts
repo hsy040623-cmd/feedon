@@ -15,6 +15,15 @@ export async function getServerAuthUserEmail(): Promise<string | null> {
   return user?.email ?? null;
 }
 
+/** 로그인한 사용자의 id (없으면 null=게스트). projects.owner_id와 비교해 "내 프로젝트"만 보여줄 때 쓴다 */
+export async function getServerAuthUserId(): Promise<string | null> {
+  const supabase = await createSupabaseServerAuthClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
 export async function createSupabaseServerAuthClient() {
   const cookieStore = await cookies();
 

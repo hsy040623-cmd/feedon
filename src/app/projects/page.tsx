@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase";
 import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
+import { fetchVisibleProjects } from "@/lib/project-visibility";
 import ScrollMotionField from "@/components/ScrollMotionField";
 import SiteHeader from "@/components/SiteHeader";
 import ProjectListPanel from "@/components/ProjectListPanel";
@@ -8,16 +8,11 @@ import ProjectListPanel from "@/components/ProjectListPanel";
 // Design Ref: DESIGN.md 화면3(프로젝트 목록 화면) — 프로젝트를 아직 선택하지 않았을 때 진입하는 경로.
 // 프로젝트가 있으면 가장 최근 프로젝트로 이동하고, 없으면 안내와 함께 새 프로젝트 만들기로 유도한다.
 // Plan SC: PLAN.md 작업 14번 — 프로젝트별 요청 이력 화면(상태별 목록) 구현
+// Design Ref: CHECK.md 1번 — 전체 프로젝트가 아니라 "내(로그인 시)/이 브라우저(게스트)" 프로젝트만 보여준다.
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const supabase = createSupabaseServerClient();
-  const { data } = await supabase
-    .from("projects")
-    .select("id, name, created_at")
-    .order("created_at", { ascending: false });
-
-  const projects = (data ?? []).map((p) => ({ id: p.id, name: p.name, createdAt: p.created_at }));
+  const projects = await fetchVisibleProjects();
 
   if (projects.length > 0) {
     redirect(`/projects/${projects[0].id}`);

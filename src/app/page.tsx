@@ -1,21 +1,16 @@
-import { createSupabaseServerClient } from "@/lib/supabase";
 import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
+import { fetchVisibleProjects } from "@/lib/project-visibility";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import SiteHeader from "@/components/SiteHeader";
 import MotionLink from "@/components/MotionLink";
 
 // Design Ref: DESIGN.md 화면1 — 히어로에서 "+ 시작하기"를 누르면 /start(모션 온보딩)로 이동한다.
 // plus-ex.com 레퍼런스: 진입 시 눈에 띄는 모션 배경 히어로 + 오른쪽 고정 탭
+// Design Ref: CHECK.md 1번 — 전체 프로젝트 개수가 아니라 "내(로그인 시)/이 브라우저(게스트)" 개수만 보여준다.
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const supabase = createSupabaseServerClient();
-  const { data } = await supabase
-    .from("projects")
-    .select("id, name")
-    .order("created_at", { ascending: false });
-
-  const projects = data ?? [];
+  const projects = await fetchVisibleProjects();
   const userEmail = await getServerAuthUserEmail();
 
   return (
