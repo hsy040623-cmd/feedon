@@ -4,6 +4,7 @@ import { getServerAuthUserEmail } from "@/lib/supabase-server-auth";
 import ScrollMotionField from "@/components/ScrollMotionField";
 import SiteHeader from "@/components/SiteHeader";
 import { REQUEST_STATUS_LABEL } from "@/lib/request-status";
+import { getFileExtension, withFileNameSuffix } from "@/lib/upload-constraints";
 import type { ChangeItem, RequestStatus } from "@/types/domain";
 import ApproveRejectActions from "@/components/ApproveRejectActions";
 
@@ -55,18 +56,25 @@ export default async function RequestDetailPage(
     ? `${originalUrlData.signedUrl}&download=${encodeURIComponent(request.target_file_name)}`
     : null;
 
+  const changes = (proposal?.changes ?? []) as ChangeItem[];
+  const status = request.status as RequestStatus;
+
+  // 제안 파일은 원본과 같은 이름으로 내려보내지 않는다 — 작업자가 구분하려고 이름을 고치다가
+  // 확장자(.docx)를 지워버리면 워드가 아닌 텍스트 파일로 열려버린다.
+  const proposalFileName = withFileNameSuffix(
+    request.target_file_name,
+    status === "APPROVED" ? "최종" : "반영제안"
+  );
+
   let proposalUrl: string | null = null;
   if (proposal) {
     const { data: proposalUrlData } = await supabase.storage
       .from("feedback-files")
       .createSignedUrl(proposal.proposed_file_storage_path, SIGNED_URL_EXPIRES_IN_SECONDS);
     proposalUrl = proposalUrlData?.signedUrl
-      ? `${proposalUrlData.signedUrl}&download=${encodeURIComponent(request.target_file_name)}`
+      ? `${proposalUrlData.signedUrl}&download=${encodeURIComponent(proposalFileName)}`
       : null;
   }
-
-  const changes = (proposal?.changes ?? []) as ChangeItem[];
-  const status = request.status as RequestStatus;
   const isNeedsReview = status === "NEEDS_REVIEW";
   const isFailed = status === "FAILED";
   const userEmail = await getServerAuthUserEmail();
@@ -133,8 +141,10 @@ export default async function RequestDetailPage(
             </h2>
             {proposalUrl ? (
               <>
-                <p className="text-sm">
-                  {request.target_file_name} {status === "APPROVED" ? "(최종)" : "(제안)"}
+                <p className="text-sm">{proposalFileName}</p>
+                <p className="text-xs text-zinc-500">
+                  이름을 바꿀 때 뒤의 확장자(.{getFileExtension(request.target_file_name)})는 꼭 남겨두세요. 지우면
+                  워드가 아닌 텍스트 파일로 열립니다.
                 </p>
                 <a
                   href={proposalUrl}
