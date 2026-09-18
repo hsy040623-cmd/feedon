@@ -14,9 +14,6 @@ import ApproveRejectActions from "@/components/ApproveRejectActions";
 // Plan SC: PLAN.md 작업 13번 — 승인/반려 버튼을 실제 처리 API(ApproveRejectActions)에 연결한다.
 export const dynamic = "force-dynamic";
 
-/** Storage는 비공개 버킷이라, 서버에서 짧게 유효한 서명된 다운로드 링크를 만들어서 내려준다 */
-const SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 10;
-
 export default async function RequestDetailPage(
   props: PageProps<"/workspace/[projectId]/requests/[requestId]">
 ) {
@@ -45,17 +42,6 @@ export default async function RequestDetailPage(
     .eq("request_id", request.id)
     .maybeSingle();
 
-  // Storage 키는 확장자만 쓰는 안전한 이름이라(원본 파일명은 여기서만 쓰임), 다운로드할 때
-  // 브라우저가 원래 파일명으로 저장하도록 download 파라미터를 붙인다.
-  // (createSignedUrl의 download 옵션은 한글 등 비-ASCII 파일명을 이중 인코딩하는 라이브러리 버그가 있어
-  // 직접 encodeURIComponent로 한 번만 인코딩해 붙인다)
-  const { data: originalUrlData } = await supabase.storage
-    .from("feedback-files")
-    .createSignedUrl(request.target_file_storage_path, SIGNED_URL_EXPIRES_IN_SECONDS);
-  const originalDownloadUrl = originalUrlData?.signedUrl
-    ? `${originalUrlData.signedUrl}&download=${encodeURIComponent(request.target_file_name)}`
-    : null;
-
   const changes = (proposal?.changes ?? []) as ChangeItem[];
   const status = request.status as RequestStatus;
 
@@ -66,15 +52,14 @@ export default async function RequestDetailPage(
     status === "APPROVED" ? "최종" : "반영제안"
   );
 
-  let proposalUrl: string | null = null;
-  if (proposal) {
-    const { data: proposalUrlData } = await supabase.storage
-      .from("feedback-files")
-      .createSignedUrl(proposal.proposed_file_storage_path, SIGNED_URL_EXPIRES_IN_SECONDS);
-    proposalUrl = proposalUrlData?.signedUrl
-      ? `${proposalUrlData.signedUrl}&download=${encodeURIComponent(proposalFileName)}`
-      : null;
-  }
+  // 다운로드는 Storage 서명 URL을 직접 링크하지 않고 앱의 라우트를 거친다. 같은 도메인이라
+  // <a download>가 동작해 파일명이 확실히 지켜지고, 링크가 10분 뒤 만료되는 문제도 없다.
+  //
+  // 반려하면 제안 파일은 Storage에서 지워지지만 proposals 행은 이력으로 남는다(reject 라우트).
+  // 그래서 행이 있는지만 보고 링크를 띄우면 눌렀을 때 깨지므로, 반려된 요청은 링크를 만들지 않는다.
+  const originalDownloadUrl = `/api/requests/${request.id}/download?type=original`;
+  const proposalDownloadUrl =
+    proposal && status !== "REJECTED" ? `/api/requests/${request.id}/download?type=proposal` : null;
   const isNeedsReview = status === "NEEDS_REVIEW";
   const isFailed = status === "FAILED";
   const userEmail = await getServerAuthUserEmail();
@@ -124,30 +109,28 @@ export default async function RequestDetailPage(
           <div className="flex flex-col gap-2">
             <h2 className="text-xs font-bold uppercase tracking-wide">원본 파일</h2>
             <p className="text-sm">{request.target_file_name}</p>
-            {originalDownloadUrl ? (
-              <a
-                href={originalDownloadUrl}
-                className="w-fit rounded-full bg-black px-3 py-1 text-xs font-bold text-white transition-all hover:bg-accent"
-              >
-                원본 다운로드
-              </a>
-            ) : (
-              <p className="text-xs text-zinc-500">다운로드 링크를 불러올 수 없어요.</p>
-            )}
+            <a
+              href={originalDownloadUrl}
+              download={request.target_file_name}
+              className="w-fit rounded-full bg-black px-3 py-1 text-xs font-bold text-white transition-all hover:bg-accent"
+            >
+              원본 다운로드
+            </a>
           </div>
           <div className="flex flex-col gap-2">
             <h2 className="text-xs font-bold uppercase tracking-wide">
               {status === "APPROVED" ? "최종 확정 파일" : "반영 제안 파일"}
             </h2>
-            {proposalUrl ? (
+            {proposalDownloadUrl ? (
               <>
                 <p className="text-sm">{proposalFileName}</p>
                 <p className="text-xs text-zinc-500">
-                  이름을 바꿀 때 뒤의 확장자(.{getFileExtension(request.target_file_name)})는 꼭 남겨두세요. 지우면
-                  워드가 아닌 텍스트 파일로 열립니다.
+                  저장 창이 뜨면 이름 뒤의 확장자(.{getFileExtension(request.target_file_name)})는 꼭 남겨두세요.
+                  지우면 워드가 아닌 텍스트 파일로 열립니다.
                 </p>
                 <a
-                  href={proposalUrl}
+                  href={proposalDownloadUrl}
+                  download={proposalFileName}
                   className="w-fit rounded-full bg-black px-3 py-1 text-xs font-bold text-white transition-all hover:bg-accent"
                 >
                   {status === "APPROVED" ? "최종 파일 다운로드" : "제안 파일 다운로드"}
