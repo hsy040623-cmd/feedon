@@ -19,7 +19,8 @@ const SYSTEM_PROMPT = `당신은 클라이언트의 디자인/문서 수정 요�
   "ambiguityReason": string | null,
   "changes": [
     { "location": string, "before": string, "after": string }
-  ]
+  ],
+  "colorChange": { "targetColorHex": string } | null
 }
 
 규칙:
@@ -27,12 +28,20 @@ const SYSTEM_PROMPT = `당신은 클라이언트의 디자인/문서 수정 요�
 - 텍스트의 지시와 이미지에 표시된 지시가 서로 다르거나 상충하면(예: 텍스트는 "제목을 바꿔달라"고 하는데 이미지는 다른 부분을 가리키는 경우) ambiguous를 true로 하고, 무엇이 상충하는지 ambiguityReason에 설명하세요.
 - 요청이 명확하면 ambiguous를 false로 하고, changes에 추출한 항목을 모두 담으세요.
 - 변경 전 내용(before)을 알 수 없으면("어딘가 있는 제목을 바꿔주세요" 등 위치만 있고 원문을 모르는 경우) 그 자체로는 모호로 보지 않되, before는 빈 문자열로 둘 수 있습니다.
+- 문서 "전체" 텍스트의 색상을 바꿔달라는 요청(예: "전체 글자를 파란색으로", "모든 텍스트를 빨간색으로 해주세요")이면, changes는 빈 배열로 두고 ambiguous는 false로 한 뒤, colorChange에 { "targetColorHex": "RRGGBB 형식의 6자리 16진수(앞에 # 없이)" }를 채우세요. 색상 이름(파란색, 빨간색 등)은 가장 가까운 표준 색상의 16진수로 변환하세요(예: 파란색→0000FF, 빨간색→FF0000, 검정→000000, 흰색→FFFFFF).
+- 색상 변경이 아니면 colorChange는 반드시 null로 두세요.
+- 전체가 아니라 "제목만", "특정 단어만" 등 일부 범위의 색상 변경이나, 색상이 아닌 다른 서식(글꼴, 굵기, 크기, 정렬 등) 변경 요청은 아직 지원하지 않습니다 — 이런 요청은 ambiguous를 true로 하고 ambiguityReason에 "지금은 문서 전체 텍스트 색상 변경만 지원합니다"라고 안내하세요.
 - JSON 외의 다른 텍스트는 출력하지 마세요.`;
+
+/** #RRGGBB의 RRGGBB 부분(앞의 #은 뺀 6자리 16진수)만 유효한 값으로 인정한다 */
+const HEX_COLOR_PATTERN = /^[0-9A-Fa-f]{6}$/;
 
 export interface AnalyzeTextResult {
   ambiguous: boolean;
   ambiguityReason?: string;
   changes: ChangeItem[];
+  /** 문서 전체 텍스트를 이 색으로 바꿔달라는 요청이면 채워진다 (RRGGBB, # 없음) */
+  colorChange: { targetColorHex: string } | null;
 }
 
 export interface ReferenceImageInput {
@@ -72,7 +81,12 @@ export async function analyzeRequest(
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
 
-  let parsed: { ambiguous?: boolean; ambiguityReason?: string | null; changes?: ChangeItem[] };
+  let parsed: {
+    ambiguous?: boolean;
+    ambiguityReason?: string | null;
+    changes?: ChangeItem[];
+    colorChange?: { targetColorHex?: string } | null;
+  };
   try {
     parsed = JSON.parse(raw);
   } catch {
@@ -81,12 +95,19 @@ export async function analyzeRequest(
       ambiguous: true,
       ambiguityReason: "AI 분석 결과를 해석하지 못했습니다. 다시 시도해주세요.",
       changes: [],
+      colorChange: null,
     };
   }
+
+  // AI가 형식에 안 맞는 색상값을 주면(예: "blue", "#00F") 무시한다 — 잘못된 값을 그대로 문서에 쓰면
+  // 파일이 깨질 수 있어, 유효한 RRGGBB 6자리 16진수일 때만 채택한다.
+  const rawHex = parsed.colorChange?.targetColorHex?.replace(/^#/, "");
+  const colorChange = rawHex && HEX_COLOR_PATTERN.test(rawHex) ? { targetColorHex: rawHex.toUpperCase() } : null;
 
   return {
     ambiguous: Boolean(parsed.ambiguous),
     ambiguityReason: parsed.ambiguityReason ?? undefined,
     changes: Array.isArray(parsed.changes) ? parsed.changes : [],
+    colorChange,
   };
 }

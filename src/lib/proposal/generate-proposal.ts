@@ -15,6 +15,8 @@ export interface GenerateProposalInput {
   /** 업로드 시 대상 파일의 Content-Type (패스스루일 때 그대로 사용) */
   contentType: string;
   changes: ChangeItem[];
+  /** 문서 전체 텍스트를 이 색으로 바꿔달라는 요청이면 채워진다 (RRGGBB, # 없음). 현재 워드만 지원. */
+  colorChange?: { targetColorHex: string } | null;
 }
 
 export interface GenerateProposalOutput {
@@ -25,9 +27,12 @@ export interface GenerateProposalOutput {
 
 type FormatGenerator = (input: GenerateProposalInput) => Promise<GenerateProposalOutput>;
 
-/** 워드(.docx) — word/document.xml 안에서 before → after 텍스트를 실제로 치환한다 (PLAN.md 9번) */
-const docxGenerator: FormatGenerator = async ({ targetFileBuffer, contentType, changes }) => ({
-  buffer: await applyChangesToDocx(targetFileBuffer, changes),
+/**
+ * 워드(.docx) — word/document.xml 안에서 before → after 텍스트를 실제로 치환한다 (PLAN.md 9번).
+ * colorChange가 있으면 문서 전체 텍스트 색상도 함께 바꾼다.
+ */
+const docxGenerator: FormatGenerator = async ({ targetFileBuffer, contentType, changes, colorChange }) => ({
+  buffer: await applyChangesToDocx(targetFileBuffer, changes, colorChange ?? null),
   contentType,
 });
 

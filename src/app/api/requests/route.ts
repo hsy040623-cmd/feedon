@@ -146,7 +146,9 @@ export async function POST(request: Request) {
 
   try {
     const analysis = await analyzeRequest(trimmedText, referenceImageInputs);
-    if (analysis.ambiguous || analysis.changes.length === 0) {
+    const hasActionableChange = analysis.changes.length > 0 || Boolean(analysis.colorChange);
+
+    if (analysis.ambiguous || !hasActionableChange) {
       finalStatus = "NEEDS_REVIEW";
       ambiguityReason = analysis.ambiguityReason ?? "요청 내용이 모호합니다.";
       await supabase
@@ -160,7 +162,21 @@ export async function POST(request: Request) {
         format: extension as TargetFileFormat,
         contentType: targetFileContentType,
         changes: analysis.changes,
+        colorChange: analysis.colorChange,
       });
+
+      // 색상 변경은 before/after 텍스트가 없어 changes 배열 형태로 표현이 안 되니,
+      // 화면·이력에 보여줄 수 있게 같은 모양의 항목으로 하나 추가해 함께 저장한다.
+      const changesForDisplay = analysis.colorChange
+        ? [
+            ...analysis.changes,
+            {
+              location: "문서 전체",
+              before: "(현재 텍스트 색상)",
+              after: `#${analysis.colorChange.targetColorHex} 색상`,
+            },
+          ]
+        : analysis.changes;
 
       const proposalId = randomUUID();
       const proposalStoragePath = `requests/${requestId}/proposal-${proposalId}.${extension}`;
@@ -173,7 +189,7 @@ export async function POST(request: Request) {
       const { error: proposalInsertError } = await supabase.from("proposals").insert({
         id: proposalId,
         request_id: requestId,
-        changes: analysis.changes,
+        changes: changesForDisplay,
         proposed_file_storage_path: proposalStoragePath,
       });
 
@@ -182,7 +198,7 @@ export async function POST(request: Request) {
       finalStatus = "PROPOSED";
       await supabase
         .from("requests")
-        .update({ status: finalStatus, extracted_changes: analysis.changes })
+        .update({ status: finalStatus, extracted_changes: changesForDisplay })
         .eq("id", requestId);
     }
   } catch (analysisError) {
