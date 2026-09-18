@@ -21,17 +21,73 @@ function escapeXmlText(text: string): string {
 }
 
 /**
+ * OOXML 스키마(CT_RPr / CT_ParaRPr)에서 <w:color>보다 반드시 앞에 와야 하는 자식 요소들.
+ *
+ * 워드의 run 서식(<w:rPr>)은 자식 요소를 "아무 순서로나" 넣을 수 없고 스키마가 정한 순서를
+ * 지켜야 한다. 특히 <w:color>는 rFonts·b(굵게)·i(기울임) 같은 요소들보다 뒤에 와야 한다.
+ * 이걸 어기면 워드가 파일을 열지 못하고 손상된 문서로 취급한다 —
+ * 굵은 글씨나 글꼴이 지정된 문서만 깨지고 서식 없는 단순 문서는 멀쩡했던 원인이 바로 이것이다.
+ */
+const ELEMENTS_BEFORE_COLOR = [
+  // CT_ParaRPr(문단 기호 서식)에만 있는 변경 이력 요소들이 맨 앞에 온다
+  "ins",
+  "del",
+  "moveFrom",
+  "moveTo",
+  // 여기서부터는 CT_RPr와 공통
+  "rStyle",
+  "rFonts",
+  "b",
+  "bCs",
+  "i",
+  "iCs",
+  "caps",
+  "smallCaps",
+  "strike",
+  "dstrike",
+  "outline",
+  "shadow",
+  "emboss",
+  "imprint",
+  "noProof",
+  "snapToGrid",
+  "vanish",
+  "webHidden",
+];
+
+/** <w:color .../> 또는 <w:color ...></w:color> 형태의 기존 색상 지정을 모두 찾아내는 정규식 */
+const EXISTING_COLOR_PATTERN = /<w:color\b[^>]*(?:\/>|>[\s\S]*?<\/w:color>)/g;
+
+/**
+ * <w:rPr> 안쪽 내용(inner)에서 기존 색상 지정을 지우고, 스키마가 허용하는 자리에 새 색상을 넣는다.
+ * 넣을 자리는 "색상보다 앞에 와야 하는 요소들" 중 마지막 요소의 바로 뒤다.
+ */
+function setColorInRunProperties(inner: string, targetColorHex: string): string {
+  const withoutColor = inner.replace(EXISTING_COLOR_PATTERN, "");
+  const colorTag = `<w:color w:val="${targetColorHex}"/>`;
+
+  // 색상보다 앞에 와야 하는 요소들 중 가장 뒤에서 끝나는 지점을 찾는다
+  let insertAt = 0;
+  for (const tag of ELEMENTS_BEFORE_COLOR) {
+    const pattern = new RegExp(`<w:${tag}\\b[^>]*(?:/>|>[\\s\\S]*?</w:${tag}>)`, "g");
+    for (const match of withoutColor.matchAll(pattern)) {
+      insertAt = Math.max(insertAt, match.index + match[0].length);
+    }
+  }
+
+  return `${withoutColor.slice(0, insertAt)}${colorTag}${withoutColor.slice(insertAt)}`;
+}
+
+/**
  * 문서 안의 모든 텍스트 run(<w:r>)이 targetColorHex 색상을 쓰도록 word/document.xml을 고친다.
- * - 이미 <w:rPr>(run 서식)이 있는 run은 그 안의 <w:color>를 바꾸거나(없으면 추가) 한다.
+ * - 이미 <w:rPr>(run 서식)이 있는 run은 그 안의 기존 <w:color>를 지우고, 스키마가 정한 자리에 넣는다.
  * - <w:rPr>이 아예 없는 run은 <w:rPr><w:color .../></w:rPr>을 새로 만들어 넣는다.
  * - 내용이 없는 self-closing run(<w:r/>)은 칠할 텍스트가 없어 건드리지 않는다.
  *
  * 실제 워드 문서에는 속성 없는 run 서식이 <w:rPr></w:rPr>이 아니라 <w:rPr/>(self-closing)로
- * 저장되는 경우가 흔한데, 이전 버전은 이걸 "rPr 없음"으로 착각해 <w:rPr>을 하나 더 끼워 넣었다.
- * 한 run 안에 <w:rPr>이 두 번 들어가거나(중복), self-closing run 뒤에 <w:rPr>이 형제로 붙는 등
- * 잘못된 XML이 만들어져 워드가 파일을 손상된 것으로 인식하는 문제가 있었다 — 그래서 0번 단계로
- * self-closing <w:rPr/>을 먼저 <w:rPr></w:rPr>로 정규화하고, self-closing run은 아예 건드리지 않게
- * 고쳤다.
+ * 저장되는 경우가 흔한데, 이걸 "rPr 없음"으로 착각하면 <w:rPr>이 중복으로 들어가 파일이 깨진다 —
+ * 그래서 0번 단계로 self-closing <w:rPr/>을 먼저 <w:rPr></w:rPr>로 정규화하고, self-closing run은
+ * 아예 건드리지 않는다.
  * 정식 XML 파서 없이 정규식으로 처리하므로, 아주 드물게 문서 구조가 특이하면(중첩된 표 등)
  * 일부 run을 놓칠 수 있다 — "전체 텍스트 색상 변경" 1차 지원의 알려진 한계로 남겨둔다.
  */
@@ -39,14 +95,11 @@ function applyColorToDocumentXml(xml: string, targetColorHex: string): string {
   // 0) self-closing 빈 run 서식(<w:rPr/>)을 <w:rPr></w:rPr>로 정규화해서 1번 단계가 인식하게 한다.
   let result = xml.replace(/<w:rPr\s*\/>/g, "<w:rPr></w:rPr>");
 
-  // 1) 이미 <w:rPr>...</w:rPr>이 있는 run: 그 안의 <w:color>를 교체하거나, 없으면 추가한다.
-  result = result.replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (_match, inner: string) => {
-    if (/<w:color\b[^/>]*\/>/.test(inner)) {
-      const updatedInner = inner.replace(/<w:color\b[^/>]*\/>/, `<w:color w:val="${targetColorHex}"/>`);
-      return `<w:rPr>${updatedInner}</w:rPr>`;
-    }
-    return `<w:rPr><w:color w:val="${targetColorHex}"/>${inner}</w:rPr>`;
-  });
+  // 1) 이미 <w:rPr>...</w:rPr>이 있는 run: 스키마 순서를 지켜 색상을 교체/추가한다.
+  result = result.replace(
+    /<w:rPr>([\s\S]*?)<\/w:rPr>/g,
+    (_match, inner: string) => `<w:rPr>${setColorInRunProperties(inner, targetColorHex)}</w:rPr>`
+  );
 
   // 2) <w:rPr>이 아예 없는, 내용이 있는 run(<w:r> 또는 <w:r rsidRPr="...">)에만 새로 만들어 넣는다.
   //    self-closing run(<w:r/>, <w:r .../>)은 닫는 ">"가 항상 "/" 바로 뒤에 오므로
