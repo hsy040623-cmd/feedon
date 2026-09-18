@@ -24,5 +24,8 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* layout.tsx에서 불러오는 Geist를 실제로 쓴다.
+     create-next-app 기본값(Arial, Helvetica)이 그대로 남아 Geist를 덮고 있었는데,
+     Arial·Helvetica에는 Light(300) 굵기가 없어서 font-light를 줘도 보통 굵기로 보였다. */
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
