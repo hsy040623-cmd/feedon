@@ -1,36 +1,147 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FEEDON — 클라이언트 피드백 반영 도우미
 
-## Getting Started
+클라이언트가 보낸 수정 요청을 AI가 읽고, 워드·엑셀·파워포인트 파일에 반영한 **"제안 파일"**을 자동으로 만들어주는 도구입니다.
 
-First, run the development server:
+프리랜서 디자이너·개발자와 외주 제작 에이전시를 위해 만들었습니다. 이메일이나 메신저로 온 "이 문구 이렇게 바꿔주세요" 같은 요청을 붙여넣으면, 어떤 부분을 어떻게 고칠지 AI가 추출해 실제 파일에 적용한 사본을 만들어줍니다.
+
+## 무엇을 해결하나
+
+수정 요청은 보통 비정형 텍스트로 옵니다. 작업자는 그걸 하나하나 읽고, 어느 파일 어느 부분인지 직접 찾아 수동으로 고쳐야 합니다. 요청이 쌓이거나 여러 클라이언트를 동시에 응대하면 무엇을 반영했는지 추적이 어려워지고, 누락과 오반영이 생깁니다.
+
+이 도구는 그 해석·검색·반영 단계를 자동화하고, 사람은 **확인과 승인만** 하게 합니다.
+
+## 핵심 원칙
+
+이 서비스는 세 가지 규칙을 반드시 지킵니다.
+
+1. **원본은 절대 덮어쓰지 않는다.** AI가 만든 수정안은 항상 별도의 "제안(Preview)" 파일로만 생성됩니다. 작업자가 승인하기 전까지 원본 파일은 그대로 남습니다.
+2. **애매하면 손대지 않는다.** 요청이 모호하거나 서로 상충하면 임의로 해석해 반영하지 않고 "확인 요청" 상태로 분류해 사람에게 넘깁니다.
+3. **파일 데이터는 비공개로 다룬다.** 업로드된 클라이언트 요청과 파일은 광고나 모델 재학습 등 목적 외 용도로 쓰지 않습니다.
+
+## 이용 흐름
+
+```
+프로젝트 만들기
+   ↓
+수정 요청 텍스트 입력 (+ 참고 이미지, 대상 파일 업로드)
+   ↓
+AI가 "무엇을 / 어떻게" 쌍으로 수정 항목 추출
+   ↓
+├─ 명확함  → 제안 파일 자동 생성
+└─ 모호함  → "확인 요청" 상태로 분류
+   ↓
+작업자가 원본과 제안을 비교 확인
+   ↓
+승인 (최종 확정) 또는 반려 (제안 폐기)
+```
+
+## 주요 기능
+
+- **요청 분석** — 텍스트와 참고 이미지를 함께 읽어 수정 대상과 내용을 쌍으로 추출합니다.
+- **파일 자동 반영** — 워드는 문서 안의 텍스트 치환과 전체 글자 색상 변경을, 엑셀·파워포인트는 텍스트 치환을 지원합니다.
+- **승인 / 반려** — 제안을 확인하고 승인하면 최종 파일로 확정되고, 반려하면 제안 파일은 폐기됩니다.
+- **프로젝트별 이력** — 클라이언트(작업 건)별로 요청을 나눠 상태별로 확인할 수 있습니다. 프로젝트 이름은 나중에 바꿀 수 있습니다.
+- **로그인 없이도 사용** — 게스트로 바로 쓸 수 있고, 회원가입하면 여러 기기에서 내 프로젝트를 볼 수 있습니다.
+
+## 지원 파일 형식
+
+| 형식 | 지원 | 비고 |
+|---|---|---|
+| 워드 `.docx` | ✅ | 텍스트 치환 + 문서 전체 글자 색상 변경 |
+| 엑셀 `.xlsx` | ✅ | 텍스트 치환 |
+| 파워포인트 `.pptx` | ✅ | 텍스트 치환 |
+| 한글 `.hwp` | ❌ | 공식 API가 없어 제외 |
+| 포토샵·일러스트레이터·인디자인 | ❌ | 공식 API 부재/불안정으로 제외 |
+
+업로드 용량은 대상 파일·참고 이미지 각각 20MB까지입니다. 참고 이미지는 PNG·JPG만 받습니다.
+
+### 알려진 한계
+
+워드는 서식이 바뀌는 경계(굵게 처리된 단어 등)에서 한 문장을 여러 조각으로 쪼개 저장합니다. 이 경우 문장이 파일 안에서 한 덩어리로 붙어있지 않아 단순 치환으로는 찾지 못할 수 있고, 그런 요청은 반영되지 않고 원본이 그대로 남습니다.
+
+## 기술 스택
+
+- **프레임워크** — Next.js (App Router), TypeScript, Tailwind CSS
+- **AI 분석** — OpenAI API
+- **데이터·파일 저장** — Supabase (Postgres + Storage)
+- **문서 처리** — JSZip으로 OOXML(`.docx`/`.xlsx`/`.pptx`) 내부 XML을 직접 다룸
+- **배포** — Vercel
+
+## 로컬에서 실행하기
+
+### 1. 의존성 설치
+
+```bash
+npm install
+```
+
+### 2. 환경 변수 설정
+
+프로젝트 루트에 `.env` 파일을 만들고 아래 값을 채웁니다.
+
+```bash
+# Supabase (프로젝트 설정 > API 에서 확인)
+NEXT_PUBLIC_SUPABASE_URL=https://<프로젝트>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+SUPABASE_SERVICE_ROLE_KEY=<service role key>
+
+# OpenAI
+OPENAI_API_KEY=<api key>
+```
+
+> `SUPABASE_SERVICE_ROLE_KEY`는 모든 권한을 가진 키입니다. 서버에서만 쓰이며, 브라우저 코드에서 절대 불러오지 않습니다. `.env`는 `.gitignore`에 등록돼 있어 커밋되지 않습니다.
+
+### 3. 데이터베이스 준비
+
+`supabase/migrations/` 안의 SQL을 Supabase 프로젝트에 적용하고, Storage에 `feedback-files` 이름의 **비공개** 버킷을 만듭니다.
+
+```bash
+supabase db push
+```
+
+### 4. 개발 서버 실행
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 명령어
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| 명령어 | 설명 |
+|---|---|
+| `npm run dev` | 개발 서버 실행 |
+| `npm run build` | 프로덕션 빌드 |
+| `npm run start` | 빌드된 결과 실행 |
+| `npm run lint` | ESLint 검사 |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 프로젝트 구조
 
-## Learn More
+```
+src/
+├── app/
+│   ├── api/                  라우트 핸들러 (요청 생성·승인·반려·다운로드)
+│   ├── projects/             프로젝트 목록·상세
+│   ├── workspace/            요청 입력 및 제안 확인 화면
+│   └── login, signup, ...    인증 화면
+├── components/               화면 구성 요소
+├── lib/
+│   ├── ai/                   OpenAI 요청 분석
+│   ├── proposal/             포맷별 파일 반영 로직 (docx / xlsx / pptx)
+│   └── supabase*.ts          Supabase 클라이언트 (서버·브라우저 분리)
+└── types/                    공용 타입
 
-To learn more about Next.js, take a look at the following resources:
+supabase/migrations/          데이터베이스 스키마
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 기획 문서
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+이 저장소에는 개발 과정에서 쓴 문서가 함께 들어있습니다.
 
-## Deploy on Vercel
+- [PRD.md](PRD.md) — 기획서 (배경, 목표, 범위)
+- [DESIGN.md](DESIGN.md) — 설계 (데이터 흐름, API 명세, 화면)
+- [PLAN.md](PLAN.md) — 개발 단위별 작업 계획
+- [CHECK.md](CHECK.md) — 점검 기록
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 라이선스
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+개인 학습·포트폴리오 목적으로 만든 프로젝트입니다.
