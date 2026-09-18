@@ -24,12 +24,23 @@ function escapeXmlText(text: string): string {
  * 문서 안의 모든 텍스트 run(<w:r>)이 targetColorHex 색상을 쓰도록 word/document.xml을 고친다.
  * - 이미 <w:rPr>(run 서식)이 있는 run은 그 안의 <w:color>를 바꾸거나(없으면 추가) 한다.
  * - <w:rPr>이 아예 없는 run은 <w:rPr><w:color .../></w:rPr>을 새로 만들어 넣는다.
+ * - 내용이 없는 self-closing run(<w:r/>)은 칠할 텍스트가 없어 건드리지 않는다.
+ *
+ * 실제 워드 문서에는 속성 없는 run 서식이 <w:rPr></w:rPr>이 아니라 <w:rPr/>(self-closing)로
+ * 저장되는 경우가 흔한데, 이전 버전은 이걸 "rPr 없음"으로 착각해 <w:rPr>을 하나 더 끼워 넣었다.
+ * 한 run 안에 <w:rPr>이 두 번 들어가거나(중복), self-closing run 뒤에 <w:rPr>이 형제로 붙는 등
+ * 잘못된 XML이 만들어져 워드가 파일을 손상된 것으로 인식하는 문제가 있었다 — 그래서 0번 단계로
+ * self-closing <w:rPr/>을 먼저 <w:rPr></w:rPr>로 정규화하고, self-closing run은 아예 건드리지 않게
+ * 고쳤다.
  * 정식 XML 파서 없이 정규식으로 처리하므로, 아주 드물게 문서 구조가 특이하면(중첩된 표 등)
  * 일부 run을 놓칠 수 있다 — "전체 텍스트 색상 변경" 1차 지원의 알려진 한계로 남겨둔다.
  */
 function applyColorToDocumentXml(xml: string, targetColorHex: string): string {
+  // 0) self-closing 빈 run 서식(<w:rPr/>)을 <w:rPr></w:rPr>로 정규화해서 1번 단계가 인식하게 한다.
+  let result = xml.replace(/<w:rPr\s*\/>/g, "<w:rPr></w:rPr>");
+
   // 1) 이미 <w:rPr>...</w:rPr>이 있는 run: 그 안의 <w:color>를 교체하거나, 없으면 추가한다.
-  let result = xml.replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (_match, inner: string) => {
+  result = result.replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (_match, inner: string) => {
     if (/<w:color\b[^/>]*\/>/.test(inner)) {
       const updatedInner = inner.replace(/<w:color\b[^/>]*\/>/, `<w:color w:val="${targetColorHex}"/>`);
       return `<w:rPr>${updatedInner}</w:rPr>`;
@@ -37,9 +48,13 @@ function applyColorToDocumentXml(xml: string, targetColorHex: string): string {
     return `<w:rPr><w:color w:val="${targetColorHex}"/>${inner}</w:rPr>`;
   });
 
-  // 2) <w:rPr>이 아예 없는 run(<w:r> 또는 <w:r rsidRPr="...">): 새로 만들어 넣는다.
-  //    1번 단계에서 이미 <w:rPr>이 붙은 run은 <w:r(...)> 바로 뒤에 <w:rPr>이 오므로 건너뛴다.
-  result = result.replace(/(<w:r\b[^>]*>)(?!\s*<w:rPr>)/g, `$1<w:rPr><w:color w:val="${targetColorHex}"/></w:rPr>`);
+  // 2) <w:rPr>이 아예 없는, 내용이 있는 run(<w:r> 또는 <w:r rsidRPr="...">)에만 새로 만들어 넣는다.
+  //    self-closing run(<w:r/>, <w:r .../>)은 닫는 ">"가 항상 "/" 바로 뒤에 오므로
+  //    (?<!\/)>로 제외한다 — 내용이 없어 칠할 게 없고, 잘못 건드리면 구조가 깨진다.
+  result = result.replace(
+    /<w:r(?:\s[^>]*)?(?<!\/)>(?!\s*<w:rPr>)/g,
+    (match) => `${match}<w:rPr><w:color w:val="${targetColorHex}"/></w:rPr>`
+  );
 
   return result;
 }
