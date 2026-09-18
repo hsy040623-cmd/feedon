@@ -133,30 +133,60 @@ export default function RequestForm({ projectId }: { projectId: string }) {
         <label htmlFor="reference-images" className="text-xs font-bold uppercase tracking-wide text-black">
           참고 이미지/스크린샷 (선택, PNG/JPG, 20MB 이하)
         </label>
-        <input
-          id="reference-images"
-          type="file"
-          accept="image/png,image/jpeg"
-          multiple
-          onChange={handleReferenceImagesChange}
-        />
-        {referenceImages.length > 0 && (
-          <p className="w-fit rounded-full border-2 border-black px-3 py-1 text-xs font-bold text-black">
-            {referenceImages.length}개 선택됨
-          </p>
-        )}
+        {/* 파일 입력은 브라우저 기본 버튼이 디자인과 맞지 않아 숨기고, label을 버튼처럼 쓴다.
+            display:none 대신 sr-only로 숨겨야 키보드 사용자가 계속 접근할 수 있고,
+            input을 label보다 앞에 둬야 peer-focus-visible로 초점 표시를 줄 수 있다. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            id="reference-images"
+            type="file"
+            accept="image/png,image/jpeg"
+            multiple
+            onChange={handleReferenceImagesChange}
+            className="peer sr-only"
+          />
+          <label
+            htmlFor="reference-images"
+            className="w-fit cursor-pointer rounded-full border-2 border-black bg-black px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-white transition-all hover:border-accent hover:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2"
+          >
+            이미지 선택
+          </label>
+          {referenceImages.length > 0 ? (
+            <p className="w-fit rounded-full border-2 border-black px-3 py-1 text-xs font-bold text-black">
+              {referenceImages.length}개 선택됨
+            </p>
+          ) : (
+            <span className="text-xs text-zinc-500">선택된 이미지가 없어요</span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
         <label htmlFor="target-file" className="text-xs font-bold uppercase tracking-wide text-black">
           대상 파일 (워드 .docx / 엑셀 .xlsx / 파워포인트 .pptx, 20MB 이하)
         </label>
-        <input id="target-file" type="file" accept=".docx,.xlsx,.pptx" onChange={handleTargetFileChange} />
-        {targetFile && (
-          <p className="w-fit rounded-full border-2 border-black px-3 py-1 text-xs font-bold text-black">
-            {targetFile.name}
-          </p>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            id="target-file"
+            type="file"
+            accept=".docx,.xlsx,.pptx"
+            onChange={handleTargetFileChange}
+            className="peer sr-only"
+          />
+          <label
+            htmlFor="target-file"
+            className="w-fit cursor-pointer rounded-full border-2 border-black bg-black px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-white transition-all hover:border-accent hover:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2"
+          >
+            파일 선택
+          </label>
+          {targetFile ? (
+            <p className="w-fit max-w-full truncate rounded-full border-2 border-black px-3 py-1 text-xs font-bold text-black">
+              {targetFile.name}
+            </p>
+          ) : (
+            <span className="text-xs text-zinc-500">선택된 파일이 없어요</span>
+          )}
+        </div>
       </div>
 
       <MotionButton

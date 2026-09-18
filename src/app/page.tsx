@@ -29,8 +29,9 @@ export default async function Home() {
 
       <section className="relative flex min-h-[80vh] items-end overflow-hidden bg-black pb-16">
         <AnimatedBackground />
-        <h1 className="relative z-10 px-6 text-4xl font-black uppercase leading-[0.95] tracking-tight text-white sm:text-6xl">
-          Feedback
+        {/* 사용자 요청: 첫 줄만 진하게, 아래 두 줄은 얇게 — 기본 굵기를 light로 두고 첫 줄만 black */}
+        <h1 className="relative z-10 px-6 text-4xl font-light uppercase leading-[0.95] tracking-tight text-white sm:text-6xl">
+          <span className="font-black">Feedback</span>
           <br />
           Reflection
           <br />
