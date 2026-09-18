@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import type { ChangeItem } from "@/types/domain";
+import { ZIP_OUTPUT_OPTIONS, ZIP_WRITE_OPTIONS } from "./zip-output";
 
 // Design Ref: DESIGN.md 3번(기술 선택) — 파워포인트 파일 안의 텍스트를 찾아 바꾸는 문서 처리 로직.
 // Plan SC: PLAN.md 작업 11번 — 파워포인트(.pptx) 반영 제안 생성 기능.
@@ -47,9 +48,9 @@ export async function applyChangesToPptx(fileBuffer: Buffer, changes: ChangeItem
       const after = escapeXmlText(change.after);
       xml = xml.split(before).join(after);
     }
-    zip.file(slidePath, xml);
+    zip.file(slidePath, xml, ZIP_WRITE_OPTIONS);
   }
 
-  const output = await zip.generateAsync({ type: "nodebuffer" });
+  const output = await zip.generateAsync(ZIP_OUTPUT_OPTIONS);
   return output;
 }

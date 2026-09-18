@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import type { ChangeItem } from "@/types/domain";
+import { ZIP_OUTPUT_OPTIONS, ZIP_WRITE_OPTIONS } from "./zip-output";
 
 // Design Ref: DESIGN.md 3번(기술 선택) — 엑셀 파일 안의 텍스트를 찾아 바꾸는 문서 처리 로직.
 // Plan SC: PLAN.md 작업 10번 — 엑셀(.xlsx) 반영 제안 생성 기능.
@@ -43,7 +44,7 @@ export async function applyChangesToXlsx(fileBuffer: Buffer, changes: ChangeItem
     xml = xml.split(before).join(after);
   }
 
-  zip.file(sharedStringsPath, xml);
-  const output = await zip.generateAsync({ type: "nodebuffer" });
+  zip.file(sharedStringsPath, xml, ZIP_WRITE_OPTIONS);
+  const output = await zip.generateAsync(ZIP_OUTPUT_OPTIONS);
   return output;
 }
